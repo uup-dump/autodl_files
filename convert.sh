@@ -1,5 +1,5 @@
 #!/bin/bash
-scriptName="UUP Converter v0.5.4"
+scriptName="UUP Converter v0.5.5"
 UUP_CONVERTER_SCRIPT=1
 
 if [ -f `dirname $0`/convert_ve_plugin ]; then
@@ -16,6 +16,8 @@ fi
 
 editions='analogonecore
 andromeda
+cloud
+cloudn
 cloude
 clouden
 core
