@@ -1,13 +1,15 @@
 #!/bin/bash
-scriptName="UUP Converter v0.5.5"
+scriptName="UUP Converter v0.6.0"
 UUP_CONVERTER_SCRIPT=1
 
 if [ -f `dirname $0`/convert_ve_plugin ]; then
   . `dirname $0`/convert_ve_plugin
 fi
 
-if [ -f `dirname $0`/convert_config_linux ]; then
+if [ -f `dirname $0`/convert_config_linux ] && [ `uname` == "Linux" ]; then
   . `dirname $0`/convert_config_linux
+elif [ -f `dirname $0`/convert_config_macos ] && [ `uname` == "Darwin" ]; then
+  . `dirname $0`/convert_config_macos
 else
   VIRTUAL_EDITIONS_LIST="CoreSingleLanguage Enterprise EnterpriseN Education \
   EducationN ProfessionalEducation ProfessionalEducationN \
@@ -238,18 +240,6 @@ sources/..-.*/wimprovider.dll.mui
 sources/..-.*/WinDlp.dll.mui
 sources/..-.*/winsetup.dll.mui'
 
-bcdPatch='cd \Objects\{7619dcc9-fafe-11d9-b411-000476eba25f}\Elements
-nk 250000c2
-cd 250000c2
-nv 3 Element
-ed Element
-8
-:00000  00 00 00 00 00 00 00 00
-s
-q
-y
-'
-
 infoColor="\033[1;94m"
 errorColor="\033[1;91m"
 resetColor="\033[0m"
@@ -266,7 +256,11 @@ if [ "$1" == "-?" -o "$1" == "--help" -o "$1" == "-h" ]; then
   echo "0 - do not create virtual editions (default)"
   echo "1 - create virtual edtitions"
   echo ""
-  echo -e "${infoColor}convert_config_linux file${resetColor}"
+  if [ `uname` == "Linux" ]; then
+    echo -e "${infoColor}convert_config_linux file${resetColor}"
+  elif [ `uname` == "Darwin" ]; then
+    echo -e "${infoColor}convert_config_macos file${resetColor}"
+  fi
   echo "This file can be used to configure some advanced options of this script."
   echo "It is required to place configuration in the same directory as script."
   echo ""
@@ -284,16 +278,26 @@ fi
 if ! which cabextract >/dev/null 2>&1 \
 || ! which wimlib-imagex >/dev/null 2>&1 \
 || ! which chntpw >/dev/null 2>&1 \
-|| ! which genisoimage >/dev/null 2>&1; then
+|| ! which genisoimage >/dev/null 2>&1 \
+&& ! which mkisofs >/dev/null 2>&1; then
   echo "One of required applications is not installed."
   echo "The following applications need to be installed to use this script:"
   echo " - cabextract"
   echo " - wimlib-imagex"
   echo " - chntpw"
-  echo " - genisoimage"
+  echo " - genisoimage or mkisofs"
   echo ""
-  echo "If you use Debian or Ubuntu you can install these using:"
-  echo "sudo apt-get install cabextract wimtools chntpw genisoimage"
+  if [ `uname` == "Linux" ]; then
+    # Linux
+    echo "If you use Debian or Ubuntu you can install these using:"
+    echo "sudo apt-get install cabextract wimtools chntpw genisoimage"
+  elif [ `uname` == "Darwin" ]; then
+    # macOS
+    echo "macOS requires Homebrew (https://brew.sh) to install the prerequisite software."
+    echo "If you use Homebrew, you can install these using:"
+    echo "brew tap sidneys/homebrew"
+    echo "brew install cabextract wimlib cdrtools sidneys/homebrew/chntpw"
+  fi
   exit 1
 fi
 
@@ -363,7 +367,7 @@ fi
 
 list=
 
-lang=$(grep -i "_..-.*.esd" <<< "$metadataFiles" | head -1 | sed 's/.*_//g;s/.esd//gi')
+lang=$(grep -i "_..-.*.esd" <<< "$metadataFiles" | head -1 | tr '[:upper:]' '[:lower:]' | sed 's/.*_//g;s/.esd//g')
 metadataFiles=$(grep -i "$lang" <<< "$metadataFiles" | sort | uniq)
 firstMetadata=$(head -1 <<< "$metadataFiles")
 
@@ -548,14 +552,22 @@ wimlib-imagex optimize ISODIR/sources/install.$type
 echo ""
 
 if [ $build -ge 18890 ]; then
-  chntpw -e ISODIR/boot/bcd <<< "$bcdPatch" >/dev/null
-  chntpw -e ISODIR/efi/microsoft/boot/bcd <<< "$bcdPatch" >/dev/null
+  wimlib-imagex extract "$firstMetadata" 3 "/Windows/Boot/Fonts" \
+    --no-acls --dest-dir="ISODIR/boot" >/dev/null
+  mv -f ISODIR/boot/Fonts/* ISODIR/boot/fonts
+  rm -r ISODIR/boot/Fonts
 fi
 
 echo -e "$infoColor""Creating ISO image...""$resetColor"
 find ISODIR -exec touch {} +
 
-genisoimage -b "boot/etfsboot.com" --no-emul-boot \
+# Use mkisofs as fallback to genisoimage
+genisoimage="$(command -v genisoimage)"
+if [ -z "$genisoimage" ]; then
+  genisoimage="$(command -v mkisofs)"
+fi
+
+"$genisoimage" -b "boot/etfsboot.com" --no-emul-boot \
   --eltorito-alt-boot -b "efi/microsoft/boot/efisys.bin" --no-emul-boot \
   --udf --hide "*" -V "$isoLabel" -o "$isoName" ISODIR
 
