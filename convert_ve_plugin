@@ -1425,7 +1425,10 @@ function createVirtualEdition() {
 
   wimlib-imagex info ISODIR/sources/install.$type "$newName" \
     --image-property DESCRIPTION="$description" \
-    --image-property WINDOWS/EDITIONID=$edition
+    --image-property DISPLAYNAME="$description" \
+    --image-property DISPLAYDESCRIPTION="$description" \
+    --image-property WINDOWS/EDITIONID=$edition \
+    --image-property FLAGS=$edition
 
   if [ $? != 0 ]; then
     echo "Failed to update information for $edition."

@@ -1,5 +1,5 @@
 #!/bin/bash
-scriptName="UUP Converter v0.6.0"
+scriptName="UUP Converter v0.6.2"
 UUP_CONVERTER_SCRIPT=1
 
 if [ -f `dirname $0`/convert_ve_plugin ]; then
@@ -39,8 +39,12 @@ enterprises
 enterpriseseval
 enterprisesn
 enterprisesneval
+holographic
+iotenterprise
+iotenterprises
 iotuap
 onecoreupdateos
+ppipro
 professional
 professionalcountryspecific
 professionaleducation
@@ -55,6 +59,8 @@ serverazurecor
 serverazurecorcore
 serverazurenano
 serverazurenanocore
+serverazurestackhcicor
+serverazurestackhcicorcore
 servercloudstorage
 servercloudstoragecore
 serverdatacenter
@@ -94,6 +100,10 @@ serverstorageworkgroup
 serverstorageworkgroupcore
 serverstorageworkgroupeval
 serverstorageworkgroupevalcore
+serverturbine
+serverturbinecor
+serverturbinecorcore
+serverturbinecore
 serverweb
 serverwebcore
 starter
@@ -124,6 +134,8 @@ sources/appraiser.dll
 sources/ARUNIMG.dll
 sources/arunres.dll
 sources/autorun.dll
+sources/bcd.dll
+sources/bootsvc.dll
 sources/cmisetup.dll
 sources/compatctrl.dll
 sources/compatprovider.dll
@@ -143,8 +155,8 @@ sources/hwcompat.dll
 sources/hwcompat.txt
 sources/hwexclude.txt
 sources/idwbinfo.txt
+sources/imagelib.dll
 sources/imagingprovider.dll
-sources/inf/setup.cfg
 sources/input.dll
 sources/lang.ini
 sources/locale.nls
@@ -161,6 +173,7 @@ sources/reagent.xml
 sources/rollback.exe
 sources/schema.dat
 sources/segoeui.ttf
+sources/ServicingCommon.dll
 sources/setup.exe
 sources/setupcompat.dll
 sources/SetupCore.dll
@@ -195,6 +208,7 @@ sources/wdscsl.dll
 sources/wdsimage.dll
 sources/wdstptc.dll
 sources/wdsutil.dll
+sources/wimgapi.dll
 sources/wimprovider.dll
 sources/win32ui.dll
 sources/WinDlp.dll
@@ -221,11 +235,11 @@ sources/..-.*/reagent.adml
 sources/..-.*/reagent.dll.mui
 sources/..-.*/rollback.exe.mui
 sources/..-.*/setup.exe.mui
+sources/..-.*/setup_help_upgrade_or_custom.rtf
 sources/..-.*/setupcompat.dll.mui
 sources/..-.*/SetupCore.dll.mui
 sources/..-.*/setupplatform.exe.mui
 sources/..-.*/SetupPrep.exe.mui
-sources/..-.*/setup_help_upgrade_or_custom.rtf
 sources/..-.*/smiengine.dll.mui
 sources/..-.*/spwizres.dll.mui
 sources/..-.*/upgloader.dll.mui
@@ -236,6 +250,7 @@ sources/..-.*/vofflps_server.rtf
 sources/..-.*/w32uires.dll.mui
 sources/..-.*/wdsclient.dll.mui
 sources/..-.*/wdsimage.dll.mui
+sources/..-.*/wimgapi.dll.mui
 sources/..-.*/wimprovider.dll.mui
 sources/..-.*/WinDlp.dll.mui
 sources/..-.*/winsetup.dll.mui'
@@ -381,7 +396,8 @@ if [ $runVirtualEditions -eq 1 ] && [ "$VIRTUAL_EDITIONS_PLUGIN_LOADED" != "1" ]
   runVirtualEditions=0
 fi
 
-for file in `find "$uupDir" -type f -iname "*.cab"`; do
+reffiles=0
+for file in `find "$uupDir" -type f -iname "*.cab" -not -iname "*windows10.0-kb*.cab"`; do
   fileName=`basename $file .cab`
   echo -e "$infoColor""CAB -> ESD:""$resetColor"" $fileName"
 
@@ -391,6 +407,8 @@ for file in `find "$uupDir" -type f -iname "*.cab"`; do
 
   wimlib-imagex capture "$extractDir" "$tempDir/$fileName.esd" >/dev/null
   errorHandler $? "Failed to create $fileName.esd"
+
+  let reffiles++
 
   rm -rf "$extractDir"
 done
@@ -420,7 +438,7 @@ echo ""
 echo -e "$infoColor""Creating boot.wim...""$resetColor"
 cp "$tempDir/winre.wim" ISODIR/sources/boot.wim
 
-wimlib-imagex info ISODIR/sources/boot.wim 1 "Microsoft Windows PE" \
+wimlib-imagex info ISODIR/sources/boot.wim 1 "Microsoft Windows PE" "Microsoft Windows PE" \
   --image-property FLAGS=9 >/dev/null
 
 wimlib-imagex extract ISODIR/sources/boot.wim 1 --dest-dir="$tempDir" \
@@ -449,7 +467,7 @@ wimlib-imagex update ISODIR/sources/boot.wim 1 \
   --command "delete /Windows/System32/winpeshl.ini" >/dev/null
 
 wimlib-imagex export "$tempDir/winre.wim" 1 \
-  ISODIR/sources/boot.wim "Microsoft Windows Setup"
+  ISODIR/sources/boot.wim "Microsoft Windows Setup" "Microsoft Windows Setup"
 
 errorHandler $? "Failed to create second index of boot.wim"
 
@@ -469,6 +487,7 @@ list=
 
 echo "delete /Windows/System32/winpeshl.ini" >"$tempDir/update.txt"
 echo "add ISODIR/setup.exe /setup.exe" >>"$tempDir/update.txt"
+echo "add ISODIR/sources/inf/setup.cfg /sources/inf/setup.cfg" >>"$tempDir/update.txt"
 echo "add ISODIR/sources/background_cli.bmp /sources/background.bmp" >>"$tempDir/update.txt"
 echo "add ISODIR/sources/background_cli.bmp /Windows/system32/winre.jpg" >>"$tempDir/update.txt"
 for i in $files; do
@@ -491,12 +510,20 @@ for metadata in $metadataFiles; do
 
   echo -e "$infoColor""Exporting $editionName to install.$type...""$resetColor"
 
-  wimlib-imagex export "$metadata" 3 ISODIR/sources/install.$type \
-    "$editionName" $compressParam --ref="$uupDir/*.esd" --ref "$tempDir/*.esd"
+  if [ $reffiles -ge 1 ]; then
+    wimlib-imagex export "$metadata" 3 ISODIR/sources/install.$type \
+      "$editionName" $compressParam --ref="$uupDir/*.esd" --ref "$tempDir/*.esd"
+  else
+    wimlib-imagex export "$metadata" 3 ISODIR/sources/install.$type \
+      "$editionName" $compressParam --ref="$uupDir/*.esd"
+  fi
 
   errorHandler $? "Failed to export $editionName to install.$type""$resetColor"
 
   let indexesExported++
+
+  wimlib-imagex info ISODIR/sources/install.$type $indexesExported \
+    --image-property FLAGS="$currentEdition" >/dev/null
 
   echo ""
   echo -e "$infoColor""Adding winre.wim for $editionName...""$resetColor"
@@ -547,14 +574,17 @@ if [ -e "$isoName" ]; then
   rm "$isoName"
 fi
 
-echo -e "$infoColor""Optimizing install.$type...""$resetColor"
-wimlib-imagex optimize ISODIR/sources/install.$type
-echo ""
+if [ $addedVirtualEditions -ge 1 ]; then
+  echo -e "$infoColor""Optimizing install.$type...""$resetColor"
+  wimlib-imagex optimize ISODIR/sources/install.$type
+  echo ""
+fi
 
 if [ $build -ge 18890 ]; then
   wimlib-imagex extract "$firstMetadata" 3 "/Windows/Boot/Fonts" \
     --no-acls --dest-dir="ISODIR/boot" >/dev/null
   mv -f ISODIR/boot/Fonts/* ISODIR/boot/fonts
+  cp ISODIR/boot/fonts/* ISODIR/efi/microsoft/boot/fonts
   rm -r ISODIR/boot/Fonts
 fi
 
@@ -567,9 +597,14 @@ if [ -z "$genisoimage" ]; then
   genisoimage="$(command -v mkisofs)"
 fi
 
-"$genisoimage" -b "boot/etfsboot.com" --no-emul-boot \
-  --eltorito-alt-boot -b "efi/microsoft/boot/efisys.bin" --no-emul-boot \
-  --udf --hide "*" -V "$isoLabel" -o "$isoName" ISODIR
+if [ "$arch" == "arm64" ]; then
+  "$genisoimage" -b "efi/microsoft/boot/efisys.bin" --no-emul-boot \
+    --udf --hide "*" -V "$isoLabel" -o "$isoName" ISODIR
+else
+  "$genisoimage" -b "boot/etfsboot.com" --no-emul-boot \
+    --eltorito-alt-boot -b "efi/microsoft/boot/efisys.bin" --no-emul-boot \
+    --udf --hide "*" -V "$isoLabel" -o "$isoName" ISODIR
+fi
 
 errorHandler $? "Failed to create ISO image""$resetColor"
 
