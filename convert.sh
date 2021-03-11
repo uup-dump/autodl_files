@@ -1,5 +1,5 @@
 #!/bin/bash
-scriptName="UUP Converter v0.6.2"
+scriptName="UUP Converter v0.6.3"
 UUP_CONVERTER_SCRIPT=1
 
 if [ -f `dirname $0`/convert_ve_plugin ]; then
@@ -390,6 +390,15 @@ tempDir=`mktemp -d`
 extractDir="$tempDir/extract"
 
 echo -e "\033[1m$scriptName\033[0m"
+
+updatesDetected=false
+for file in `find "$uupDir" -type f -iname "windows10.0-kb*.cab"`; do
+  updatesDetected=true
+done
+
+if [ $updatesDetected == true ]; then
+  echo -e "\033[33mNote: This script does now allow the integration of updates.\nUse the Windows version of the converter to integrate updates."
+fi
 
 if [ $runVirtualEditions -eq 1 ] && [ "$VIRTUAL_EDITIONS_PLUGIN_LOADED" != "1" ]; then
   echo "Virtual editions will be not created, because plugin isn't loaded."
