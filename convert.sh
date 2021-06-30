@@ -608,11 +608,11 @@ fi
 
 if [ "$arch" == "arm64" ]; then
   "$genisoimage" -b "efi/microsoft/boot/efisys.bin" --no-emul-boot \
-    --udf --hide "*" -V "$isoLabel" -o "$isoName" ISODIR
+    --udf -iso-level 3 --hide "*" -V "$isoLabel" -o "$isoName" ISODIR
 else
   "$genisoimage" -b "boot/etfsboot.com" --no-emul-boot \
     --eltorito-alt-boot -b "efi/microsoft/boot/efisys.bin" --no-emul-boot \
-    --udf --hide "*" -V "$isoLabel" -o "$isoName" ISODIR
+    --udf -iso-level 3 --hide "*" -V "$isoLabel" -o "$isoName" ISODIR
 fi
 
 errorHandler $? "Failed to create ISO image""$resetColor"
